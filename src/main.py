@@ -7,7 +7,8 @@ from analytics import calculate_chain_email_stats
 def main():
     # Initialize Gmail API
     gmail_api = GmailAPI()
-    gmail_api.list_email_tags()
+    email_list = gmail_api.get_emails()
+    print(email_list)
     # messages = gmail_api.get_mailing_list_emails()
 
     # # Parse Emails
