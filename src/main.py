@@ -2,13 +2,34 @@ from gmail_api import GmailAPI
 from email_parser import EmailParser
 from unsubscribe_service import UnsubscribeService
 from analytics import calculate_chain_email_stats
+import pandas as pd
+
+
+def write_to_csv_with_pandas(email_list, csv_file):
+    # Flatten nested dictionary
+    flattened_email_list = []
+    for email in email_list:
+        flattened_email = email.copy()  # Make a shallow copy
+        sender_info = flattened_email.pop(
+            "sender"
+        )  # Remove and return the 'sender' dict
+        flattened_email.update(sender_info)  # Merge the nested dictionary into the copy
+        flattened_email_list.append(flattened_email)
+
+    # Create a DataFrame from the list of dictionaries
+    df = pd.DataFrame(flattened_email_list)
+
+    # Write DataFrame to CSV
+    df.to_csv(csv_file, index=False)
 
 
 def main():
     # Initialize Gmail API
     gmail_api = GmailAPI()
     email_list = gmail_api.get_emails()
-    print(email_list)
+    write_to_csv_with_pandas(
+        email_list=email_list, csv_file="outputs/email_metadata.csv"
+    )
     # messages = gmail_api.get_mailing_list_emails()
 
     # # Parse Emails

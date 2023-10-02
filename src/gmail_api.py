@@ -20,6 +20,12 @@ class GmailAPI:
     def __init__(self):
         self.service = self.get_api_credentials()
 
+    def execute_with_status(func, *args, **kwargs):
+        print("Executing function...", end="", flush=True)
+        result = func(*args, **kwargs)
+        print("Done")
+        return result
+
     def get_api_credentials(self):
         creds = None
         # The file token.json stores the user's access and refresh tokens, and is
