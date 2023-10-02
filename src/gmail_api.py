@@ -18,7 +18,9 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 class GmailAPI:
     def __init__(self):
+        self.creds = None
         self.service = self.get_api_credentials()
+        
 
     def execute_with_status(func, *args, **kwargs):
         print("Executing function...", end="", flush=True)
@@ -31,10 +33,19 @@ class GmailAPI:
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
+
+        if not os.path.exists("credentials"):
+            os.makedirs("credentials")
+
+        # Check if the token.json file exists
         if os.path.exists("credentials/token.json"):
-            self.creds = Credentials.from_authorized_user_file(
-                "credentials/token.json", SCOPES
-            )
+            try:
+                self.creds = Credentials.from_authorized_user_file(
+                    "credentials/token.json", SCOPES
+            )   
+            except Exception as e:
+                print(f"An error occurred while loading token.json: {e}")
+
         # If there are no (valid) credentials available, let the user log in.
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
@@ -77,11 +88,14 @@ class GmailAPI:
 
             # Create a dictionary with the extracted info
             sender_info = {"sender_name": sender_name, "sender_email": sender_email}
-            return sender_info
-        except ValueError:
+            
+        except :
             # Handle the case where the string format is incorrect
-            print("The input string format is incorrect.")
-            return None
+            
+            sender_name = ""
+            sender_email = input_str
+        
+        return sender_info
 
     def get_body_from_email_id(self, email_id):
         service = build("gmail", "v1", credentials=self.creds)
@@ -122,7 +136,7 @@ class GmailAPI:
     def get_emails(self):
         email_list = []
         service = build("gmail", "v1", credentials=self.creds)
-        result = service.users().messages().list(maxResults=10, userId="me").execute()
+        result = service.users().messages().list(maxResults=200, userId="me").execute()
         messages = result.get("messages")
         for msg in messages:
             email_dict = {}
