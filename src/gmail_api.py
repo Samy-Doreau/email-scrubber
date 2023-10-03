@@ -7,6 +7,11 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.discovery import build
+from email.utils import parsedate_to_datetime
+import pytz
+
+
 
 from bs4 import BeautifulSoup
 import base64
@@ -84,10 +89,7 @@ class GmailAPI:
 
             # Extract the name and email using string slicing
             sender_name = input_str[:open_angle].strip()
-            sender_email = input_str[open_angle + 1 : close_angle].strip()
-
-            # Create a dictionary with the extracted info
-            sender_info = {"sender_name": sender_name, "sender_email": sender_email}
+            sender_email = input_str[open_angle + 1 : close_angle].strip()    
             
         except :
             # Handle the case where the string format is incorrect
@@ -95,6 +97,8 @@ class GmailAPI:
             sender_name = ""
             sender_email = input_str
         
+        # Create a dictionary with the extracted info
+        sender_info = {"sender_name": sender_name, "sender_email": sender_email}
         return sender_info
 
     def get_body_from_email_id(self, email_id):
@@ -133,14 +137,17 @@ class GmailAPI:
         except:
             pass
 
+    
     def get_emails(self):
         email_list = []
         service = build("gmail", "v1", credentials=self.creds)
         result = service.users().messages().list(maxResults=200, userId="me").execute()
         messages = result.get("messages")
+
         for msg in messages:
             email_dict = {}
             email_dict["message_id"] = msg["id"]
+
             # Get the message from its id
             txt = service.users().messages().get(userId="me", id=msg["id"]).execute()
 
@@ -157,10 +164,15 @@ class GmailAPI:
                     if d["name"] == "From":
                         email_dict["sender"] = self.extract_sender_info(d["value"])
                     if d["name"] == "Date":
-                        email_dict["date_sent"] = d["value"]
+                        date_dt = parsedate_to_datetime(d["value"])
+                        date_utc = date_dt.astimezone(pytz.UTC)
+                        email_dict["date_sent"] = date_utc.isoformat()
+
                 email_list.append(email_dict)
 
-            except:
+            except Exception as e:
+                print(f"An error occurred: {e}")
                 pass
 
         return email_list
+

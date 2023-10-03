@@ -17,6 +17,7 @@ def convert_results_to_df(email_list):
 
     # Create a DataFrame from the list of dictionaries
     df = pd.DataFrame(flattened_email_list)
+
     return df
 
 
