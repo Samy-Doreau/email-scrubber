@@ -108,32 +108,16 @@ class GmailAPI:
         try:
             # Get value of 'payload' from dictionary 'txt'
             payload = txt["payload"]
-            headers = payload["headers"]
-
-            # Look for Subject and Sender Email in the headers
-            for d in headers:
-                if d["name"] == "Subject":
-                    subject = d["value"]
-                if d["name"] == "From":
-                    sender = d["value"]
+            
 
             # The Body of the message is in Encrypted format. So, we have to decode it.
             # Get the data and decode it with base 64 decoder.
             parts = payload.get("parts")[0]
             data = parts["body"]["data"]
             data = data.replace("-", "+").replace("_", "/")
-            # decoded_data = base64.b64decode(data)
-
-            # Now, the data obtained is in lxml. So, we will parse
-            # it with BeautifulSoup library
-            # soup = BeautifulSoup(decoded_data, "lxml")
-            # body = soup.body()
-
-            # Printing the subject, sender's email and message
-            # print("Subject: ", subject)
-            # print("From: ", sender)
-            # print("Message: ", body)
-            # print("\n")
+            decoded_data = base64.b64decode(data)
+            return decoded_data
+            
         except:
             pass
 
