@@ -1,4 +1,5 @@
 from __future__ import print_function
+from typing import List, Dict
 
 import os.path
 
@@ -12,20 +13,19 @@ from email.utils import parsedate_to_datetime
 import pytz
 
 
-
 from bs4 import BeautifulSoup
 import base64
 
 import os.path
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://mail.google.com/"]
 
 
 class GmailAPI:
     def __init__(self):
         self.creds = None
-        self.service = self.get_api_credentials()
-        
+        self.get_api_credentials()
+        self.service = build("gmail", "v1", credentials=self.creds)
 
     def execute_with_status(func, *args, **kwargs):
         print("Executing function...", end="", flush=True)
@@ -47,7 +47,7 @@ class GmailAPI:
             try:
                 self.creds = Credentials.from_authorized_user_file(
                     "credentials/token.json", SCOPES
-            )   
+                )
             except Exception as e:
                 print(f"An error occurred while loading token.json: {e}")
 
@@ -89,14 +89,14 @@ class GmailAPI:
 
             # Extract the name and email using string slicing
             sender_name = input_str[:open_angle].strip()
-            sender_email = input_str[open_angle + 1 : close_angle].strip()    
-            
-        except :
+            sender_email = input_str[open_angle + 1 : close_angle].strip()
+
+        except:
             # Handle the case where the string format is incorrect
-            
+
             sender_name = ""
             sender_email = input_str
-        
+
         # Create a dictionary with the extracted info
         sender_info = {"sender_name": sender_name, "sender_email": sender_email}
         return sender_info
@@ -108,7 +108,6 @@ class GmailAPI:
         try:
             # Get value of 'payload' from dictionary 'txt'
             payload = txt["payload"]
-            
 
             # The Body of the message is in Encrypted format. So, we have to decode it.
             # Get the data and decode it with base 64 decoder.
@@ -117,23 +116,39 @@ class GmailAPI:
             data = data.replace("-", "+").replace("_", "/")
             decoded_data = base64.b64decode(data)
             return decoded_data
-            
+
         except:
             pass
 
-    
-    def get_emails(self):
+    def get_emails(self, sender_email=None):
+        log_message = (
+            f"Fetching messages from {sender_email} .. "
+            if sender_email
+            else "Fetching messages  .. "
+        )
+        print(log_message, end="", flush=True)
         email_list = []
-        service = build("gmail", "v1", credentials=self.creds)
-        result = service.users().messages().list(maxResults=200, userId="me").execute()
+
+        query = f"from:{sender_email}" if sender_email else None
+        print(query)
+        result = (
+            self.service.users()
+            .messages()
+            .list(maxResults=200, userId="me", q=query)
+            .execute()
+        )
         messages = result.get("messages")
+        print(f"Done, {len(messages)} messages fetched from gmail. ")
+        print("Parsing messages .. ", end="", flush=True)
 
         for msg in messages:
             email_dict = {}
             email_dict["message_id"] = msg["id"]
 
             # Get the message from its id
-            txt = service.users().messages().get(userId="me", id=msg["id"]).execute()
+            txt = (
+                self.service.users().messages().get(userId="me", id=msg["id"]).execute()
+            )
 
             # Use try-except to avoid any Errors
             try:
@@ -157,6 +172,10 @@ class GmailAPI:
             except Exception as e:
                 print(f"An error occurred: {e}")
                 pass
-
+        print("Done")
         return email_list
 
+    def delete_emails(self, message_ids: List[str]):
+        for id in message_ids:
+            self.service.users().messages().delete(userId="me", id=id).execute()
+            print(f"Deleted message {id}.")
