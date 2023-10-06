@@ -9,20 +9,19 @@ import time
 
 class UnsubscribeService:
     def __init__(self, target_urls):
-        self.target_urls = target_urls
+        self.target_url = target_url
 
     def attempt_unsubscribe(self):
+        results = {}
         # Use BeautifulSoup to find 'Unsubscribe' links
         # Attempt to unsubscribe if possible
 
         driver = Chrome()
-        driver.get(self.target_urls[0])
+        driver.get(self.target_url)
         try:
             print("Attempting to unsub .. ", end="", flush=True)
-            # unsubscribe_button = driver.find_element("xpath", "//input[@type='submit']")
-            # unsubscribe_button = driver.find_element(
-            #     "xpath", "//button[@type='submit' and text()='Unsubscribe']"
-            # )
+
+            # Dirtea, healf
             wait = WebDriverWait(driver, 10)
             unsubscribe_button = wait.until(
                 EC.element_to_be_clickable(
@@ -34,20 +33,29 @@ class UnsubscribeService:
             # unsubscribe_button.click()
             print("Attempt complete. Awaiting confirmation .. ", end="", flush=True)
 
-            # Wait for the new page to load
-            time.sleep(5)  # Adjust the waiting time as needed
-
             # Check for a confirmation message
-            try:
-                confirmation_element_1 = driver.find_element(
-                    "xpath",
-                    "//*[contains(text(),'no longer subscribed') or contains(text(),'Unsubscribed')]",
-                )
-                print("Unsubscription confirmed.")
-            except NoSuchElementException:
-                print("Confirmation message not found")
+            # try:
+            #     confirmation_element_1 = driver.find_element(
+            #         "xpath",
+            #         "//*[contains(text(),'no longer subscribed') or contains(text(),'Unsubscribed' or contains(text(),'saved')]",
+            #     )
+            #     print("Unsubscription confirmed.")
+            # except NoSuchElementException:
+            #     print("Confirmation message not found")
 
+            # Wait for the new page to load
+            wait.until(
+                lambda driver: driver.execute_script("return document.readyState")
+                == "complete"
+            )
+
+            # Check if the page loaded properly (this doesn't check the HTTP status but rather if the page is interactive)
+            if driver.execute_script("return document.readyState") == "complete":
+                print("Unsubscription page loaded successfully.")
+                return {"unsub_button_found": True, "unsub_button_functional": True}
+            else:
+                print("Error loading the unsubscription page.")
+                return {"unsub_button_found": True, "unsub_button_functional": False}
         except NoSuchElementException:
             print("Unsubscribe button not found")
-
-        # //*[@id="unsub_submit"]
+            return {"unsub_button_found": False, "unsub_button_functional": None}

@@ -4,6 +4,7 @@ from unsubscribe_service import UnsubscribeService
 from analytics import create_email_agg_df, get_latest_email_id
 import pandas as pd
 import re
+import curses
 
 
 def convert_results_to_df(email_list):
@@ -28,6 +29,37 @@ def write_to_csv_with_pandas(df, csv_file):
     return df
 
 
+def list_selection(screen, items):
+    selected = [False] * len(items)
+    pos = 0  # current position
+
+    while True:
+        # Display the list
+        screen.clear()
+        for idx, item in enumerate(items):
+            if pos == idx:
+                line = "> {} [{}]".format(item, "X" if selected[idx] else " ")
+            else:
+                line = "  {} [{}]".format(item, "X" if selected[idx] else " ")
+            screen.addstr(idx, 0, line)
+
+        # Get the key pressed
+        key = screen.getch()
+
+        # Navigate or select
+        if key == curses.KEY_UP and pos > 0:
+            pos -= 1
+        elif key == curses.KEY_DOWN and pos < len(items) - 1:
+            pos += 1
+        elif key == 32:  # SPACE key
+            selected[pos] = not selected[pos]
+        elif key == 10:  # ENTER key
+            break
+
+    # Return selected items
+    return [item for idx, item in enumerate(items) if selected[idx]]
+
+
 def extract_unsubscribe_url(input_string):
     # Decode bytes to string if necessary
     if isinstance(input_string, bytes):
@@ -35,16 +67,30 @@ def extract_unsubscribe_url(input_string):
 
     # Find all URLs that start with "https://" and end with "\r\n"
     urls = re.findall(r"https://[^\r\n]+", input_string)
+    urls += re.findall(r"\[(https://[^\]]+)\]", input_string)
 
-    # Look for the URL immediately following the word "Unsubscribe"
-    for i, url in enumerate(urls):
-        if (
-            "Unsubscribe"
-            in input_string[input_string.find(url) - 50 : input_string.find(url)]
-        ):
-            return url
+    # List of trigger words/phrases that might precede an unsubscribe link
+    trigger_words = [
+        "Unsubscribe",
+        "please click here to unsubscribe. ",
+        "to opt out",
+        "to remove yourself",
+    ]
+
+    # Look for the URL immediately following any of the trigger words
+    # Look for the URL immediately following any of the trigger words
+    for trigger in trigger_words:
+        for url in urls:
+            if (
+                trigger
+                in input_string[
+                    input_string.find(url) - len(trigger) - 10 : input_string.find(url)
+                ]
+            ):
+                return url.strip("[]")
 
     # If no unsubscribe link is found, return None
+    print(f"Could not find a link to unsubscribe within email body : \n {input_string}")
     return None
 
 
@@ -74,55 +120,56 @@ def main():
 
     write_to_csv_with_pandas(df=agg_df, csv_file="outputs/agg_mail_data.csv")
 
-    target_sender_email_chx = (
-        input("Enter email to unsub from : (news@email-blacks.co.uk) \n > ")
-        or "news@email-blacks.co.uk"
-    )
-    valid_email = None
-    while valid_email is None:
-        latest_email_id = get_latest_email_id(
-            df=df, sender_email=target_sender_email_chx
-        )
+    # target_sender_email_chx = (
+    #     input("Enter email to unsub from : (news@email-blacks.co.uk) \n > ")
+    #     or "news@email-blacks.co.uk"
+    # )
+
+    filtered_df = agg_df[agg_df["email_count"] >= 3]
+
+    frequent_senders = filtered_df.iloc[:, 0].tolist()
+    selected_senders = curses.wrapper(list_selection, frequent_senders)
+    for sender in selected_senders:
+        print(f"Processing sender {sender} .. ", end="", flush=True)
+        sender_results = {}
+
+        latest_email_id = get_latest_email_id(df=df, sender_email=sender)
         valid_email = latest_email_id["success"]
         if not valid_email:
-            print("No email received from this address.\n")
+            print(f"No email received from {sender}.\n")
         else:
             target_email_id = latest_email_id["message"]
 
-    print(
-        f"Fetching email body for message id : {target_email_id} .. ",
-        end="",
-        flush=True,
-    )
-    target_email_body = gmail_api.get_body_from_email_id(email_id=target_email_id)
-    results_url = extract_unsubscribe_url(target_email_body)
-    print(results_url)
-    unsubber = UnsubscribeService([results_url])
-    unsubber.attempt_unsubscribe()
-    delete_email_choice = ""
+            print(
+                f"Fetching email body for message id : {target_email_id} .. ",
+                end="",
+                flush=True,
+            )
+            target_email_body = gmail_api.get_body_from_email_id(
+                email_id=target_email_id
+            )
+            results_url = extract_unsubscribe_url(target_email_body)
+            if results_url == None:
+                sender_results["unsub_url_present"] = False
+            else:
+                sender_results["unsub_url_present"] = True
+                unsubber = UnsubscribeService(results_url)
+                unbsub_results = unsubber.attempt_unsubscribe()
+                sender_results = {**sender_results, **unbsub_results}
+                delete_email_choice = ""
 
-    while delete_email_choice.lower() not in ["y", "n"]:
-        delete_email_choice = input("Delete emails ? (y/n) > ")
+                while delete_email_choice.lower() not in ["y", "n"]:
+                    delete_email_choice = input("Delete emails ? (y/n) > ")
 
-    if delete_email_choice == "y":
-        delete_target_emails = gmail_api.get_emails(
-            sender_email="news@email-blacks.co.uk"
-        )
-        delete_target_email_ids = [msg["message_id"] for msg in delete_target_emails]
-    # gmail_api.delete_emails(delete_target_email_ids)
-
-    # messages = gmail_api.get_mailing_list_emails()
-
-    # # Parse Emails
-    # email_parser = EmailParser(messages)
-    # emails = email_parser.parse_emails()
-
-    # # Unsubscribe
-    # unsub_service = UnsubscribeService(emails)
-    # unsub_service.attempt_unsubscribe()
-
-    # # Analytics
-    # calculate_chain_email_stats(emails)
+                if delete_email_choice == "y":
+                    delete_target_emails = gmail_api.get_emails(
+                        sender_email="news@email-blacks.co.uk"
+                    )
+                    delete_target_email_ids = [
+                        msg["message_id"] for msg in delete_target_emails
+                    ]
+                    # gmail_api.delete_emails(delete_target_email_ids)
+        print("Done.")
 
 
 if __name__ == "__main__":

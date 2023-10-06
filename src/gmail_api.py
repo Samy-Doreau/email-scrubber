@@ -141,7 +141,18 @@ class GmailAPI:
         print(f"Done, {len(messages)} messages fetched from gmail. ")
         print("Parsing messages .. ", end="", flush=True)
 
+        total_messages = len(messages)
+        index = 1
+
         for msg in messages:
+            if index == total_messages:
+                print(f"\rProcessing email {index+1}/{total_messages}")
+            else:
+                print(
+                    f"\rProcessing email {index+1}/{total_messages}", end="", flush=True
+                )
+
+            index += 1
             email_dict = {}
             email_dict["message_id"] = msg["id"]
 
