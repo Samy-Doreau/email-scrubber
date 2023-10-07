@@ -90,14 +90,15 @@ def extract_unsubscribe_url(input_string):
                 return url.strip("[]")
 
     # If no unsubscribe link is found, return None
-    print(f"Could not find a link to unsubscribe within email body : \n {input_string}")
+    # print(f"Could not find a link to unsubscribe within email body : \n {input_string}")
     return None
 
 
 def main():
     sync_from_gmail_api_chx = ""
     # Initialize Gmail API
-    gmail_api = GmailAPI()
+    gmail_api = GmailAPI(10000)
+    analyser_results = []
 
     while sync_from_gmail_api_chx.lower() not in ["y", "n"]:
         sync_from_gmail_api_chx = (
@@ -125,13 +126,14 @@ def main():
     #     or "news@email-blacks.co.uk"
     # )
 
-    filtered_df = agg_df[agg_df["email_count"] >= 3]
+    filtered_df = agg_df[agg_df["email_count"] >= 2]
 
     frequent_senders = filtered_df.iloc[:, 0].tolist()
-    selected_senders = curses.wrapper(list_selection, frequent_senders)
-    for sender in selected_senders:
+    # selected_senders = curses.wrapper(list_selection, frequent_senders)
+    print(f'Will process {len(frequent_senders)} senders.')
+    for sender in frequent_senders:
         print(f"Processing sender {sender} .. ", end="", flush=True)
-        sender_results = {}
+        sender_results = {'sender':sender}
 
         latest_email_id = get_latest_email_id(df=df, sender_email=sender)
         valid_email = latest_email_id["success"]
@@ -148,7 +150,12 @@ def main():
             target_email_body = gmail_api.get_body_from_email_id(
                 email_id=target_email_id
             )
-            results_url = extract_unsubscribe_url(target_email_body)
+            try:
+                results_url = extract_unsubscribe_url(target_email_body)
+            except:
+                sender_results["unsub_url_present"] = None
+                continue
+
             if results_url == None:
                 sender_results["unsub_url_present"] = False
             else:
@@ -156,7 +163,8 @@ def main():
                 unsubber = UnsubscribeService(results_url)
                 unbsub_results = unsubber.attempt_unsubscribe()
                 sender_results = {**sender_results, **unbsub_results}
-                delete_email_choice = ""
+
+                delete_email_choice = "n"
 
                 while delete_email_choice.lower() not in ["y", "n"]:
                     delete_email_choice = input("Delete emails ? (y/n) > ")
@@ -169,7 +177,14 @@ def main():
                         msg["message_id"] for msg in delete_target_emails
                     ]
                     # gmail_api.delete_emails(delete_target_email_ids)
+        analyser_results.append(sender_results)
         print("Done.")
+
+    # Convert to DataFrame
+    analyser_results_df = pd.DataFrame(analyser_results)
+
+    # Write to CSV
+    analyser_results_df.to_csv('./outputs/analyser_results.csv', index=False)
 
 
 if __name__ == "__main__":

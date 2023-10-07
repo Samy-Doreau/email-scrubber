@@ -22,7 +22,8 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://mail.google.c
 
 
 class GmailAPI:
-    def __init__(self):
+    def __init__(self, nb_emails):
+        self.nb_emails = nb_emails
         self.creds = None
         self.get_api_credentials()
         self.service = build("gmail", "v1", credentials=self.creds)
@@ -134,7 +135,7 @@ class GmailAPI:
         result = (
             self.service.users()
             .messages()
-            .list(maxResults=200, userId="me", q=query)
+            .list(maxResults=self.nb_emails, userId="me", q=query)
             .execute()
         )
         messages = result.get("messages")

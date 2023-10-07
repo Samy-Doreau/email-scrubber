@@ -4,11 +4,12 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import time
 
 
 class UnsubscribeService:
-    def __init__(self, target_urls):
+    def __init__(self, target_url):
         self.target_url = target_url
 
     def attempt_unsubscribe(self):
@@ -28,34 +29,30 @@ class UnsubscribeService:
                     (By.XPATH, "//button[contains(text(), 'Unsubscribe')]")
                 )
             )
-            unsubscribe_button.click()
+
+            return {"unsub_button_found": True}
+
+            # Commenting to run analyser on the full email set.
+            # unsubscribe_button.click()
 
             # unsubscribe_button.click()
-            print("Attempt complete. Awaiting confirmation .. ", end="", flush=True)
-
-            # Check for a confirmation message
-            # try:
-            #     confirmation_element_1 = driver.find_element(
-            #         "xpath",
-            #         "//*[contains(text(),'no longer subscribed') or contains(text(),'Unsubscribed' or contains(text(),'saved')]",
-            #     )
-            #     print("Unsubscription confirmed.")
-            # except NoSuchElementException:
-            #     print("Confirmation message not found")
+            # print("Attempt complete. Awaiting confirmation .. ", end="", flush=True)
 
             # Wait for the new page to load
-            wait.until(
-                lambda driver: driver.execute_script("return document.readyState")
-                == "complete"
-            )
+            # wait.until(
+            #     lambda driver: driver.execute_script("return document.readyState")
+            #     == "complete"
+            # )
 
             # Check if the page loaded properly (this doesn't check the HTTP status but rather if the page is interactive)
-            if driver.execute_script("return document.readyState") == "complete":
-                print("Unsubscription page loaded successfully.")
-                return {"unsub_button_found": True, "unsub_button_functional": True}
-            else:
-                print("Error loading the unsubscription page.")
-                return {"unsub_button_found": True, "unsub_button_functional": False}
+            # if driver.execute_script("return document.readyState") == "complete":
+            #     print("Unsubscription page loaded successfully.")
+            #     return {"unsub_button_found": True, "unsub_button_functional": True}
+            # else:
+            #     print("Error loading the unsubscription page.")
+            #     return {"unsub_button_found": True, "unsub_button_functional": False}
+        except TimeoutException:
+            return {"unsub_button_found": False}
         except NoSuchElementException:
             print("Unsubscribe button not found")
-            return {"unsub_button_found": False, "unsub_button_functional": None}
+            return {"unsub_button_found": False}
